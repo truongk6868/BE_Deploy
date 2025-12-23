@@ -418,18 +418,29 @@ namespace CondotelManagement.Services
                     }
 
                     // Áp dụng discount từ voucher
-                    if (voucher.DiscountAmount.HasValue && voucher.DiscountAmount.Value > 0)
+                    decimal voucherDiscount = 0;
+                    
+                    if (voucher.DiscountPercentage.HasValue && voucher.DiscountPercentage.Value > 0)
                     {
-                        // Giảm số tiền cố định
-                        price -= voucher.DiscountAmount.Value;
-                        if (price < 0) price = 0; // Đảm bảo giá không âm
+                        // Tính discount theo phần trăm
+                        voucherDiscount = price * (voucher.DiscountPercentage.Value / 100m);
+                        
+                        // Nếu có giới hạn tối đa (DiscountAmount), áp dụng giới hạn
+                        if (voucher.DiscountAmount.HasValue && voucher.DiscountAmount.Value > 0)
+                        {
+                            // Chỉ giảm tối đa bằng DiscountAmount
+                            voucherDiscount = Math.Min(voucherDiscount, voucher.DiscountAmount.Value);
+                        }
                     }
-                    else if (voucher.DiscountPercentage.HasValue && voucher.DiscountPercentage.Value > 0)
+                    else if (voucher.DiscountAmount.HasValue && voucher.DiscountAmount.Value > 0)
                     {
-                        // Giảm theo phần trăm
-                        decimal discountAmount = price * (voucher.DiscountPercentage.Value / 100m);
-                        price -= discountAmount;
+                        // Chỉ có giảm số tiền cố định (không có phần trăm)
+                        voucherDiscount = voucher.DiscountAmount.Value;
                     }
+                    
+                    // Áp dụng discount vào giá
+                    price -= voucherDiscount;
+                    if (price < 0) price = 0; // Đảm bảo giá không âm
 
                     appliedVoucherId = voucher.VoucherId;
                 }
