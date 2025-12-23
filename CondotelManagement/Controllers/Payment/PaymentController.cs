@@ -494,10 +494,63 @@ namespace CondotelManagement.Controllers.Payment
                         
                         await _context.SaveChangesAsync();
                         await transaction.CommitAsync();
-                        
-                        Console.WriteLine($"[Return URL] Booking {bookingId} confirmed. Email & voucher handled by webhook.");
-                        
-                        // NOTE: Webhook sẽ xử lý email + voucher để tránh timeout
+
+                        // Gửi email xác nhận booking cho tenant và host ngay tại Return URL
+                        try
+                        {
+                            var customerInfo = await _context.Users.FindAsync(booking.CustomerId);
+                            var condotel = await _context.Condotels.FindAsync(booking.CondotelId);
+                            if (customerInfo != null && condotel != null && !string.IsNullOrEmpty(customerInfo.Email))
+                            {
+                                using var scope = HttpContext.RequestServices.CreateScope();
+                                var emailService = scope.ServiceProvider.GetRequiredService<CondotelManagement.Services.Interfaces.Shared.IEmailService>();
+                                await emailService.SendBookingConfirmationEmailAsync(
+                                    toEmail: customerInfo.Email,
+                                    customerName: customerInfo.FullName ?? "Khách hàng",
+                                    bookingId: booking.BookingId,
+                                    condotelName: condotel.Name,
+                                    checkInDate: booking.StartDate,
+                                    checkOutDate: booking.EndDate,
+                                    totalAmount: booking.TotalPrice ?? 0m,
+                                    confirmedAt: DateTime.Now,
+                                    checkInToken: booking.CheckInToken,
+                                    guestFullName: booking.GuestFullName,
+                                    guestPhone: booking.GuestPhone,
+                                    guestIdNumber: booking.GuestIdNumber
+                                );
+                                Console.WriteLine($"[EMAIL][ReturnURL] Đã gửi xác nhận booking đến {customerInfo.Email} cho booking {booking.BookingId}");
+                                // Gửi email thông báo cho host về booking mới (chỉ khi host không phải là customer)
+                                var host = await _context.Hosts
+                                    .Where(h => h.HostId == condotel.HostId)
+                                    .Include(h => h.User)
+                                    .FirstOrDefaultAsync();
+                                if (host?.User != null && !string.IsNullOrEmpty(host.User.Email) && host.UserId != booking.CustomerId)
+                                {
+                                    await emailService.SendNewBookingNotificationToHostAsync(
+                                        toEmail: host.User.Email,
+                                        hostName: host.CompanyName ?? host.User.FullName ?? "Chủ nhà",
+                                        bookingId: booking.BookingId,
+                                        condotelName: condotel.Name,
+                                        customerName: customerInfo.FullName ?? "Khách hàng",
+                                        checkInDate: booking.StartDate,
+                                        checkOutDate: booking.EndDate,
+                                        totalAmount: booking.TotalPrice ?? 0m,
+                                        confirmedAt: DateTime.Now
+                                    );
+                                    Console.WriteLine($"[EMAIL][ReturnURL] Đã gửi email thông báo booking mới đến host {host.User.Email}");
+                                }
+                                else if (host?.UserId == booking.CustomerId)
+                                {
+                                    Console.WriteLine($"[EMAIL][ReturnURL] Bỏ qua gửi email cho host vì host chính là customer của booking {booking.BookingId}");
+                                }
+                            }
+                        }
+                        catch (Exception emailEx)
+                        {
+                            Console.WriteLine($"[EMAIL][ReturnURL][ERROR] Gửi email xác nhận booking: {emailEx.Message}");
+                        }
+
+                        Console.WriteLine($"[Return URL] Booking {bookingId} confirmed. Email & voucher sent.");
                         return Redirect($"{frontendUrl}/pay-done?bookingId={bookingId}&status=success&orderCode={orderCode}&paymentLinkId={id}");
                     }
                     else
