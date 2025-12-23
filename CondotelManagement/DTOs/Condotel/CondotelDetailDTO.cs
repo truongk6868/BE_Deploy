@@ -36,6 +36,9 @@ namespace CondotelManagement.DTOs
         public List<UtilityDTO> Utilities { get; set; }
         public List<PromotionDTO> Promotions { get; set; }
 
+        // Promotion đang active (nếu có)
+        public PromotionDTO? ActivePromotion { get; set; }
+
         // Giá đang active (nếu có)
         public CondotelPriceDTO? ActivePrice { get; set; }
     }

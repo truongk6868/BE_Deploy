@@ -213,7 +213,7 @@ public class CondotelService : ICondotelService
         var c = _condotelRepo.GetCondotelById(id);
         if (c == null) return null;
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
 
         return new CondotelDetailDTO
 		{
@@ -282,6 +282,24 @@ public class CondotelService : ICondotelService
 				DiscountPercentage = p.DiscountPercentage,
 				Status = p.Status
 			}).ToList(),
+			// Lấy promotion đang active (Status = "Active" và trong khoảng thời gian hiện tại)
+			ActivePromotion = c.Promotions?
+				.Where(p => p.Status == "Active" 
+					&& p.StartDate <= today 
+					&& p.EndDate >= today)
+				.OrderByDescending(p => p.DiscountPercentage) // Ưu tiên promotion có discount cao nhất
+				.Select(p => new PromotionDTO
+				{
+					PromotionId = p.PromotionId,
+					Name = p.Name,
+					StartDate = p.StartDate,
+					EndDate = p.EndDate,
+					DiscountPercentage = p.DiscountPercentage,
+					TargetAudience = p.TargetAudience,
+					Status = p.Status,
+					CondotelId = p.CondotelId
+				})
+				.FirstOrDefault(),
             // Tính toán ActivePrice: Lấy giá đang active (Status = "Hoạt động" và trong khoảng thời gian hiện tại)
             ActivePrice = c.CondotelPrices?
                 .Where(p => p.Status == "Active"
@@ -303,7 +321,7 @@ public class CondotelService : ICondotelService
 
     public IEnumerable<CondotelDTO> GetCondtelsByHost(int hostId)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var condotels = _condotelRepo.GetCondtelsByHost(hostId).ToList();
         
         return condotels.Select(c => new CondotelDTO
@@ -368,7 +386,7 @@ public class CondotelService : ICondotelService
 			int? beds,
 			int? bathrooms)
 	{
-		var today = DateOnly.FromDateTime(DateTime.UtcNow);
+		var today = DateOnly.FromDateTime(DateTime.Now);
 		var condotels = _condotelRepo.GetCondotelsByFilters(name, location, locationId, fromDate, toDate, minPrice, maxPrice, beds, bathrooms).ToList();
 		
 		return condotels.Select(c => new CondotelDTO
@@ -553,7 +571,7 @@ public class CondotelService : ICondotelService
 
     public PagedResult<CondotelDTO> GetCondtelsByHostPaged(int hostId, int pageNumber, int pageSize)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var pagedResult = _condotelRepo.GetCondtelsByHostPaged(hostId, pageNumber, pageSize);
         
         var dtoItems = pagedResult.Items.Select(c => new CondotelDTO
@@ -627,7 +645,7 @@ public class CondotelService : ICondotelService
         int pageNumber,
         int pageSize)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var pagedResult = _condotelRepo.GetCondotelsByFiltersPaged(
             name, location, locationId, fromDate, toDate, minPrice, maxPrice, beds, bathrooms, pageNumber, pageSize);
 
@@ -691,7 +709,7 @@ public class CondotelService : ICondotelService
 
     public PagedResult<CondotelDTO> GetInactiveCondotelsByHostPaged(int hostId, int pageNumber, int pageSize)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var pagedResult = _condotelRepo.GetCondtelsByHostPagedWithStatus(hostId, "Inactive", pageNumber, pageSize);
         
         var dtoItems = pagedResult.Items.Select(c => new CondotelDTO

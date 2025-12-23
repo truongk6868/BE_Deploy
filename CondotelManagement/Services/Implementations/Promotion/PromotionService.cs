@@ -72,7 +72,11 @@ namespace CondotelManagement.Services
 		if (dto.StartDate >= dto.EndDate)
 			return ResponseDTO<PromotionDTO>.Fail("Ngày bắt đầu phải nhỏ hơn ngày kết thúc.");
 
-			if (dto.EndDate < DateOnly.FromDateTime(DateTime.Now))
+			// Lấy giờ Việt Nam (UTC+7)
+			var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+			var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+			
+			if (dto.EndDate < DateOnly.FromDateTime(vietnamTime))
 				return ResponseDTO<PromotionDTO>.Fail("The end date cannot be in the pastứ.");
 
 			// Kiểm tra trùng hoặc chồng thời gian
@@ -121,7 +125,11 @@ namespace CondotelManagement.Services
 			if (dto.StartDate >= dto.EndDate)
 				return ResponseDTO<Promotion>.Fail("Start date must be less than end date.");
 
-			if (dto.EndDate < DateOnly.FromDateTime(DateTime.Now))
+			// Lấy giờ Việt Nam (UTC+7)
+			var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+			var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+			
+			if (dto.EndDate < DateOnly.FromDateTime(vietnamTime))
 				return ResponseDTO<Promotion>.Fail("The end date cannot be in the pastứ.");
 
 			// Kiểm tra trùng hoặc chồng thời gian (loại trừ promotion hiện tại đang update)

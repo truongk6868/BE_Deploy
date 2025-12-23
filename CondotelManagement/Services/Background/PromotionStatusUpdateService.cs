@@ -7,13 +7,14 @@ namespace CondotelManagement.Services.Background
 {
     /// <summary>
     /// Background service tự động cập nhật trạng thái promotion khi hết hạn
-    /// Chạy mỗi ngày lúc 00:00 UTC để cập nhật các promotion đã hết hạn
+    /// Chạy mỗi ngày lúc 00:00 giờ Việt Nam (UTC+7) để cập nhật các promotion đã hết hạn
     /// </summary>
     public class PromotionStatusUpdateService : BackgroundService
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<PromotionStatusUpdateService> _logger;
         private const int BatchSize = 100; // Xử lý 100 promotions mỗi batch
+        private readonly TimeZoneInfo _vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
 
         public PromotionStatusUpdateService(
             IServiceProvider serviceProvider,
@@ -27,14 +28,15 @@ namespace CondotelManagement.Services.Background
         {
             _logger.LogInformation("PromotionStatusUpdateService is starting.");
 
-            // Chờ đến 00:00 UTC đầu tiên
+            // Chờ đến 00:00 giờ Việt Nam đầu tiên
             await WaitUntilMidnight(stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    _logger.LogInformation("Running scheduled promotion status update at {Time}", DateTime.UtcNow);
+                    var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _vietnamTimeZone);
+                    _logger.LogInformation("Running scheduled promotion status update at {Time} (Vietnam Time)", vietnamTime);
                     await UpdateExpiredPromotionsAsync();
                 }
                 catch (Exception ex)
@@ -42,7 +44,7 @@ namespace CondotelManagement.Services.Background
                     _logger.LogError(ex, "Error occurred while updating promotion statuses.");
                 }
 
-                // Chờ đến 00:00 UTC ngày hôm sau
+                // Chờ đến 00:00 giờ Việt Nam ngày hôm sau
                 await WaitUntilMidnight(stoppingToken);
             }
 
@@ -50,15 +52,15 @@ namespace CondotelManagement.Services.Background
         }
 
         /// <summary>
-        /// Chờ đến 00:00 UTC tiếp theo
+        /// Chờ đến 00:00 giờ Việt Nam tiếp theo
         /// </summary>
         private async Task WaitUntilMidnight(CancellationToken stoppingToken)
         {
-            var now = DateTime.UtcNow;
-            var midnight = now.Date.AddDays(1); // 00:00 ngày hôm sau
-            var delay = midnight - now;
+            var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _vietnamTimeZone);
+            var midnight = vietnamTime.Date.AddDays(1); // 00:00 ngày hôm sau (giờ Việt Nam)
+            var delay = midnight - vietnamTime;
 
-            _logger.LogInformation("Waiting until {Midnight} UTC ({Delay} from now)", midnight, delay);
+            _logger.LogInformation("Waiting until {Midnight} Vietnam Time ({Delay} from now)", midnight, delay);
             await Task.Delay(delay, stoppingToken);
         }
 
@@ -73,7 +75,9 @@ namespace CondotelManagement.Services.Background
 
             try
             {
-                var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                // Lấy giờ Việt Nam (UTC+7)
+                var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _vietnamTimeZone);
+                var today = DateOnly.FromDateTime(vietnamTime);
                 int totalProcessed = 0;
 
                 // Lấy tổng số promotions cần xử lý (đã hết hạn và đang Active)
