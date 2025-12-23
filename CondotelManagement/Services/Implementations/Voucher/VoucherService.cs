@@ -10,12 +10,20 @@ namespace CondotelManagement.Services
 		private readonly IVoucherRepository _repo;
 		private readonly ICondotelRepository _condotelRepo;
 		private readonly IBookingRepository _bookingRepo;
+		private readonly TimeZoneInfo _vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
 
 		public VoucherService(IVoucherRepository repo, ICondotelRepository condotelRepository, IBookingRepository bookingRepo)
 		{
 			_repo = repo;
 			_condotelRepo = condotelRepository;
 			_bookingRepo = bookingRepo;
+		}
+
+		// Helper method để lấy ngày hiện tại theo giờ Việt Nam (UTC+7)
+		private DateOnly GetVietnamToday()
+		{
+			var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _vietnamTimeZone);
+			return DateOnly.FromDateTime(vietnamTime);
 		}
 
 		public async Task<IEnumerable<VoucherDTO>> GetVouchersByHostAsync(int hostId)
@@ -277,9 +285,9 @@ namespace CondotelManagement.Services
 			if (voucher.Status != "Active")
 				return null;
 
-		// Kiểm tra thời hạn - Voucher phải còn hiệu lực vào thời điểm đặt phòng (ngày hiện tại)
+		// Kiểm tra thời hạn - Voucher phải còn hiệu lực vào thời điểm đặt phòng (ngày hiện tại theo giờ Việt Nam)
 		// Không kiểm tra ngày check-in vì voucher chỉ cần còn hạn khi áp dụng vào booking
-		var today = DateOnly.FromDateTime(DateTime.UtcNow);
+		var today = GetVietnamToday();
 		if (today < voucher.StartDate || today > voucher.EndDate)
 			return null;
 

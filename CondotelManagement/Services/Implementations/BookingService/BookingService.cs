@@ -20,7 +20,7 @@ namespace CondotelManagement.Services
     public class BookingService : IBookingService
     {
         private readonly CondotelDbVer1Context _context;
-
+        private readonly TimeZoneInfo _vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
     
         private readonly IBookingRepository _bookingRepo;
         private readonly ICondotelRepository _condotelRepo; // để lấy giá phòng
@@ -51,6 +51,17 @@ namespace CondotelManagement.Services
             _emailService = emailService;
             _voucherService = voucherService;
             _servicePackageService = servicePackageService;
+        }
+
+        // Helper method để lấy giờ Việt Nam (UTC+7)
+        private DateTime GetVietnamNow()
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _vietnamTimeZone);
+        }
+
+        private DateOnly GetVietnamToday()
+        {
+            return DateOnly.FromDateTime(GetVietnamNow());
         }
 
         public async Task<IEnumerable<BookingDTO>> GetBookingsByCustomerAsync(int customerId)
@@ -100,7 +111,7 @@ namespace CondotelManagement.Services
                     else if (b.Status == "Confirmed")
                     {
                         // Với booking "Confirmed": Phải hoàn tiền trước 2 ngày check-in
-                        var now = DateTime.Now;
+                        var now = GetVietnamNow();
                         var startDateTime = b.StartDate.ToDateTime(TimeOnly.MinValue);
                         var daysBeforeCheckIn = (startDateTime - now).TotalDays;
                         
@@ -226,7 +237,7 @@ namespace CondotelManagement.Services
 
         public bool CheckAvailability(int condotelId, DateOnly checkIn, DateOnly checkOut)
         {
-            var today = DateOnly.FromDateTime(DateTime.Now);
+            var today = GetVietnamToday();
             var currentTransaction = _context.Database.CurrentTransaction;
             try
             {
@@ -303,7 +314,7 @@ namespace CondotelManagement.Services
                 return ServiceResultDTO.Fail("Ngày kết thúc không được để trống.");
 
             // Kiểm tra ngày hợp lệ
-            var today = DateOnly.FromDateTime(DateTime.Now);
+            var today = GetVietnamToday();
 
             if (dto.StartDate < today)
                 return ServiceResultDTO.Fail("Ngày bắt đầu không được ở trong quá khứ.");
@@ -502,7 +513,7 @@ namespace CondotelManagement.Services
                     Status = "Pending",
                     PromotionId = appliedPromotionId,
                     VoucherId = appliedVoucherId,
-                    CreatedAt = DateTime.Now,
+                    CreatedAt = GetVietnamNow(),
                     GuestFullName = dto.GuestFullName,
                     GuestPhone = dto.GuestPhone,
                     GuestIdNumber = dto.GuestIdNumber
@@ -538,7 +549,7 @@ namespace CondotelManagement.Services
                 responseDto.TotalPrice = price;
                 responseDto.VoucherId = appliedVoucherId;
                 responseDto.Status = "Pending";
-                responseDto.CreatedAt = DateTime.Now;
+                responseDto.CreatedAt = GetVietnamNow();
 
                 var entity = ToEntity(responseDto);
                 _bookingRepo.AddBooking(entity);
@@ -599,7 +610,7 @@ namespace CondotelManagement.Services
                 throw new InvalidOperationException("Không thể chỉnh sửa đặt phòng đã bị hủy.");
 
             // 4. Không cho sửa nếu còn dưới 1 ngày tới StartDate
-            var today = DateTime.Now.Date;
+            var today = GetVietnamNow().Date;
             var startDate = booking.StartDate; // kiểu DateOnly
 
             var daysBeforeCheckIn = (startDate.ToDateTime(TimeOnly.MinValue) - today).TotalDays;

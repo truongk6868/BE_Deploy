@@ -11,10 +11,18 @@ namespace CondotelManagement.Services;
 public class CondotelService : ICondotelService
 {
     private readonly ICondotelRepository _condotelRepo;
+    private readonly TimeZoneInfo _vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
 
     public CondotelService(ICondotelRepository condotelRepo)
     {
         _condotelRepo = condotelRepo;
+    }
+
+    // Helper method để lấy ngày hiện tại theo giờ Việt Nam (UTC+7)
+    private DateOnly GetVietnamToday()
+    {
+        var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _vietnamTimeZone);
+        return DateOnly.FromDateTime(vietnamTime);
     }
     public CondotelUpdateDTO CreateCondotel(CondotelCreateDTO dto)
     {
@@ -213,7 +221,7 @@ public class CondotelService : ICondotelService
         var c = _condotelRepo.GetCondotelById(id);
         if (c == null) return null;
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = GetVietnamToday();
 
         return new CondotelDetailDTO
 		{
@@ -321,7 +329,7 @@ public class CondotelService : ICondotelService
 
     public IEnumerable<CondotelDTO> GetCondtelsByHost(int hostId)
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = GetVietnamToday();
         var condotels = _condotelRepo.GetCondtelsByHost(hostId).ToList();
         
         return condotels.Select(c => new CondotelDTO
@@ -383,10 +391,10 @@ public class CondotelService : ICondotelService
 			DateOnly? toDate,
 			decimal? minPrice,
 			decimal? maxPrice,
-			int? beds,
-			int? bathrooms)
+		int? beds,
+		int? bathrooms)
 	{
-		var today = DateOnly.FromDateTime(DateTime.Now);
+		var today = GetVietnamToday();
 		var condotels = _condotelRepo.GetCondotelsByFilters(name, location, locationId, fromDate, toDate, minPrice, maxPrice, beds, bathrooms).ToList();
 		
 		return condotels.Select(c => new CondotelDTO
@@ -571,7 +579,7 @@ public class CondotelService : ICondotelService
 
     public PagedResult<CondotelDTO> GetCondtelsByHostPaged(int hostId, int pageNumber, int pageSize)
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = GetVietnamToday();
         var pagedResult = _condotelRepo.GetCondtelsByHostPaged(hostId, pageNumber, pageSize);
         
         var dtoItems = pagedResult.Items.Select(c => new CondotelDTO
@@ -645,7 +653,7 @@ public class CondotelService : ICondotelService
         int pageNumber,
         int pageSize)
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = GetVietnamToday();
         var pagedResult = _condotelRepo.GetCondotelsByFiltersPaged(
             name, location, locationId, fromDate, toDate, minPrice, maxPrice, beds, bathrooms, pageNumber, pageSize);
 
@@ -709,7 +717,7 @@ public class CondotelService : ICondotelService
 
     public PagedResult<CondotelDTO> GetInactiveCondotelsByHostPaged(int hostId, int pageNumber, int pageSize)
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = GetVietnamToday();
         var pagedResult = _condotelRepo.GetCondtelsByHostPagedWithStatus(hostId, "Inactive", pageNumber, pageSize);
         
         var dtoItems = pagedResult.Items.Select(c => new CondotelDTO
