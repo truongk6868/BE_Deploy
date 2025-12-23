@@ -277,10 +277,11 @@ namespace CondotelManagement.Services
 			if (voucher.Status != "Active")
 				return null;
 
-			// Kiểm tra thời hạn
-			var today = DateOnly.FromDateTime(DateTime.UtcNow);
-			if (bookingDate < voucher.StartDate || bookingDate > voucher.EndDate)
-				return null;
+		// Kiểm tra thời hạn - Voucher phải còn hiệu lực vào thời điểm đặt phòng (ngày hiện tại)
+		// Không kiểm tra ngày check-in vì voucher chỉ cần còn hạn khi áp dụng vào booking
+		var today = DateOnly.FromDateTime(DateTime.UtcNow);
+		if (today < voucher.StartDate || today > voucher.EndDate)
+			return null;
 
 			// Kiểm tra condotel - Voucher PHẢI có CondotelId và phải match với condotel đang booking
 			// Voucher chỉ áp dụng cho những condotel nhất định (không cho phép voucher dùng cho tất cả condotel)

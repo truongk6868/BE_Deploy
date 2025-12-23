@@ -535,7 +535,11 @@ namespace CondotelManagement.Controllers.Payment
                                         checkInDate: booking.StartDate,
                                         checkOutDate: booking.EndDate,
                                         totalAmount: booking.TotalPrice ?? 0m,
-                                        confirmedAt: DateTime.Now
+                                        confirmedAt: DateTime.Now,
+                                        checkInToken: booking.CheckInToken,
+                                        guestFullName: booking.GuestFullName,
+                                        guestPhone: booking.GuestPhone,
+                                        guestIdNumber: booking.GuestIdNumber
                                     );
                                     Console.WriteLine($"[EMAIL][ReturnURL] Đã gửi email thông báo booking mới đến host {host.User.Email}");
                                 }

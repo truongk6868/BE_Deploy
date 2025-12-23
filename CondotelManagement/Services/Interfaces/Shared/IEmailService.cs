@@ -22,7 +22,7 @@ namespace CondotelManagement.Services.Interfaces.Shared
 
 
         Task SendBookingConfirmationEmailAsync(string toEmail, string customerName, int bookingId, string condotelName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt, string? checkInToken = null, string? guestFullName = null, string? guestPhone = null, string? guestIdNumber = null);
-        Task SendNewBookingNotificationToHostAsync(string toEmail, string hostName, int bookingId, string condotelName, string customerName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt);
+        Task SendNewBookingNotificationToHostAsync(string toEmail, string hostName, int bookingId, string condotelName, string customerName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt, string? checkInToken = null, string? guestFullName = null, string? guestPhone = null, string? guestIdNumber = null);
     }
 
     public class VoucherInfo

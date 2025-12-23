@@ -548,16 +548,20 @@ namespace CondotelManagement.Services.Implementations.Payment
                                 if (host?.User != null && !string.IsNullOrEmpty(host.User.Email) && host.UserId != booking.CustomerId)
                                 {
                                     await emailService.SendNewBookingNotificationToHostAsync(
-                                        toEmail: host.User.Email,
-                                        hostName: host.CompanyName ?? host.User.FullName ?? "Chủ nhà",
-                                        bookingId: booking.BookingId,
-                                        condotelName: condotel.Name,
-                                        customerName: customerInfo.FullName ?? "Khách hàng",
-                                        checkInDate: booking.StartDate,
-                                        checkOutDate: booking.EndDate,
-                                        totalAmount: booking.TotalPrice ?? 0m,
-                                        confirmedAt: DateTime.Now
-                                    );
+                                    toEmail: host.User.Email,
+                                    hostName: host.CompanyName ?? host.User.FullName ?? "Chủ nhà",
+                                    bookingId: booking.BookingId,
+                                    condotelName: condotel.Name,
+                                    customerName: customerInfo.FullName ?? "Khách hàng",
+                                    checkInDate: booking.StartDate,
+                                    checkOutDate: booking.EndDate,
+                                    totalAmount: booking.TotalPrice ?? 0m,
+                                    confirmedAt: DateTime.Now,
+                                    checkInToken: booking.CheckInToken,
+                                    guestFullName: booking.GuestFullName,
+                                    guestPhone: booking.GuestPhone,
+                                    guestIdNumber: booking.GuestIdNumber
+                                );
 
                                     Console.WriteLine($"[Webhook] Đã gửi email thông báo booking mới đến host {host.User.Email}");
                                 }
@@ -628,7 +632,11 @@ namespace CondotelManagement.Services.Implementations.Payment
                                     checkInDate: booking.StartDate,
                                     checkOutDate: booking.EndDate,
                                     totalAmount: booking.TotalPrice ?? 0m,
-                                    confirmedAt: DateTime.Now
+                                    confirmedAt: DateTime.Now,
+                                    checkInToken: booking.CheckInToken,
+                                    guestFullName: booking.GuestFullName,
+                                    guestPhone: booking.GuestPhone,
+                                    guestIdNumber: booking.GuestIdNumber
                                 );
                                 Console.WriteLine($"[EMAIL] Đã gửi email thông báo booking mới đến host {host.User.Email}");
                             }
