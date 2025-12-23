@@ -998,72 +998,64 @@ namespace CondotelManagement.Services.Implementations.Shared
 
         public async Task SendBookingConfirmationEmailAsync(string toEmail, string customerName, int bookingId, string condotelName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt, string? checkInToken = null, string? guestFullName = null, string? guestPhone = null, string? guestIdNumber = null)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"✅ Xác nhận đặt phòng thành công - Booking #{bookingId}";
-
-            // Format dữ liệu
-            var formattedAmount = totalAmount.ToString("N0").Replace(",", ".") + " VNĐ";
-            var formattedConfirmDate = confirmedAt.ToString("dd/MM/yyyy HH:mm");
-            var formattedCheckIn = checkInDate.ToString("dd/MM/yyyy");
-            var formattedCheckOut = checkOutDate.ToString("dd/MM/yyyy");
-            
-            // Tính số đêm
-            var nights = checkOutDate.DayNumber - checkInDate.DayNumber;
-
-            // Tạo phần hiển thị CheckInToken nếu có
-            var checkInTokenHtml = string.IsNullOrEmpty(checkInToken) ? "" : $@"
-                    <tr>
-                        <td style='padding: 10px; border-bottom: 1px solid #eee;'><strong>Mã Check-in:</strong></td>
-                        <td style='padding: 10px; border-bottom: 1px solid #eee;'><span style='font-size: 18px; font-weight: bold; color: #ff6b6b; font-family: monospace;'>{checkInToken}</span></td>
-                    </tr>";
-
-            // Tạo phần hiển thị thông tin guest nếu có
-            var guestInfoHtml = "";
-            if (!string.IsNullOrEmpty(guestFullName) || !string.IsNullOrEmpty(guestPhone) || !string.IsNullOrEmpty(guestIdNumber))
+            try
             {
-                guestInfoHtml = $@"
-            <div class='info-box' style='background: #fff3cd; border-left: 4px solid #ffc107;'>
-                <h3 style='margin-top: 0; color: #ff9800;'>🎫 Thông tin người nhận phòng (Đặt hộ)</h3>
-                <table>";
-                
-                if (!string.IsNullOrEmpty(guestFullName))
-                {
-                    guestInfoHtml += $@"
-                    <tr>
-                        <td style='padding: 10px; border-bottom: 1px solid #eee;'><strong>Họ và tên:</strong></td>
-                        <td style='padding: 10px; border-bottom: 1px solid #eee;'>{guestFullName}</td>
-                    </tr>";
-                }
-                
-                if (!string.IsNullOrEmpty(guestPhone))
-                {
-                    guestInfoHtml += $@"
-                    <tr>
-                        <td style='padding: 10px; border-bottom: 1px solid #eee;'><strong>Số điện thoại:</strong></td>
-                        <td style='padding: 10px; border-bottom: 1px solid #eee;'>{guestPhone}</td>
-                    </tr>";
-                }
-                
-                if (!string.IsNullOrEmpty(guestIdNumber))
-                {
-                    guestInfoHtml += $@"
-                    <tr>
-                        <td style='padding: 10px;'><strong>CMND/CCCD:</strong></td>
-                        <td style='padding: 10px;'>{guestIdNumber}</td>
-                    </tr>";
-                }
-                
-                guestInfoHtml += $@"
-                </table>
-                <p style='margin: 10px 0 0 0; color: #d35400;'><strong>⚠️ Lưu ý:</strong> Người nhận phòng cần mang theo CMND/CCCD và thông báo cho lễ tân biết họ được đặt hộ.</p>
-            </div>";
-            }
+                Console.WriteLine($"[EMAIL] Bắt đầu gửi xác nhận booking #{bookingId} tới {toEmail}");
+                var email = new MimeMessage();
+                email.From.Add(new MailboxAddress(
+                    _config["EmailSettings:SenderName"],
+                    _config["EmailSettings:SenderEmail"]));
+                email.To.Add(MailboxAddress.Parse(toEmail));
+                email.Subject = $"✅ Xác nhận đặt phòng thành công - Booking #{bookingId}";
 
-            var htmlBody = $@"
+                // Format dữ liệu
+                var formattedAmount = totalAmount.ToString("N0").Replace(",", ".") + " VNĐ";
+                var formattedConfirmDate = confirmedAt.ToString("dd/MM/yyyy HH:mm");
+                var formattedCheckIn = checkInDate.ToString("dd/MM/yyyy");
+                var formattedCheckOut = checkOutDate.ToString("dd/MM/yyyy");
+                var nights = checkOutDate.DayNumber - checkInDate.DayNumber;
+                var checkInTokenHtml = string.IsNullOrEmpty(checkInToken) ? "" : $@"
+                        <tr>
+                            <td style='padding: 10px; border-bottom: 1px solid #eee;'><strong>Mã Check-in:</strong></td>
+                            <td style='padding: 10px; border-bottom: 1px solid #eee;'><span style='font-size: 18px; font-weight: bold; color: #ff6b6b; font-family: monospace;'>{checkInToken}</span></td>
+                        </tr>";
+                var guestInfoHtml = "";
+                if (!string.IsNullOrEmpty(guestFullName) || !string.IsNullOrEmpty(guestPhone) || !string.IsNullOrEmpty(guestIdNumber))
+                {
+                    guestInfoHtml = $@"
+                <div class='info-box' style='background: #fff3cd; border-left: 4px solid #ffc107;'>
+                    <h3 style='margin-top: 0; color: #ff9800;'>🎫 Thông tin người nhận phòng (Đặt hộ)</h3>
+                    <table>";
+                    if (!string.IsNullOrEmpty(guestFullName))
+                    {
+                        guestInfoHtml += $@"
+                        <tr>
+                            <td style='padding: 10px; border-bottom: 1px solid #eee;'><strong>Họ và tên:</strong></td>
+                            <td style='padding: 10px; border-bottom: 1px solid #eee;'>{guestFullName}</td>
+                        </tr>";
+                    }
+                    if (!string.IsNullOrEmpty(guestPhone))
+                    {
+                        guestInfoHtml += $@"
+                        <tr>
+                            <td style='padding: 10px; border-bottom: 1px solid #eee;'><strong>Số điện thoại:</strong></td>
+                            <td style='padding: 10px; border-bottom: 1px solid #eee;'>{guestPhone}</td>
+                        </tr>";
+                    }
+                    if (!string.IsNullOrEmpty(guestIdNumber))
+                    {
+                        guestInfoHtml += $@"
+                        <tr>
+                            <td style='padding: 10px;'><strong>CMND/CCCD:</strong></td>
+                            <td style='padding: 10px;'>{guestIdNumber}</td>
+                        </tr>";
+                    }
+                    guestInfoHtml += $@"
+                    </table>
+                    <p style='margin: 10px 0 0 0; color: #d35400;'><strong>⚠️ Lưu ý:</strong> Người nhận phòng cần mang theo CMND/CCCD và thông báo cho lễ tân biết họ được đặt hộ.</p>
+                </div>";
+                }
+                var htmlBody = $@"
 <!DOCTYPE html>
 <html>
 <head>
@@ -1155,25 +1147,25 @@ namespace CondotelManagement.Services.Implementations.Shared
     </div>
 </body>
 </html>";
-
-            var body = new BodyBuilder
+                var body = new BodyBuilder { HtmlBody = htmlBody };
+                email.Body = body.ToMessageBody();
+                using var smtp = new SmtpClient();
+                await smtp.ConnectAsync(
+                    _config["EmailSettings:SmtpServer"],
+                    int.Parse(_config["EmailSettings:Port"]),
+                    SecureSocketOptions.StartTls);
+                await smtp.AuthenticateAsync(
+                    _config["EmailSettings:SenderEmail"],
+                    _config["EmailSettings:Password"]);
+                await smtp.SendAsync(email);
+                await smtp.DisconnectAsync(true);
+                Console.WriteLine($"[EMAIL] Đã gửi xác nhận booking #{bookingId} tới {toEmail} thành công");
+            }
+            catch (Exception ex)
             {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+                Console.WriteLine($"[EMAIL][ERROR] Gửi xác nhận booking #{bookingId} tới {toEmail} thất bại: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task SendNewBookingNotificationToHostAsync(string toEmail, string hostName, int bookingId, string condotelName, string customerName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt)
