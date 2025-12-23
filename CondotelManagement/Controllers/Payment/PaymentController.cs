@@ -18,15 +18,18 @@ namespace CondotelManagement.Controllers.Payment
         private readonly IPayOSService _payOSService;
         private readonly CondotelDbVer1Context _context;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<PaymentController> _logger;
 
         public PaymentController(
             IPayOSService payOSService,
             CondotelDbVer1Context context,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILogger<PaymentController> logger)
         {
             _payOSService = payOSService;
             _context = context;
             _configuration = configuration;
+            _logger = logger;
         }
 
         // Backward compatibility endpoint
@@ -607,9 +610,10 @@ namespace CondotelManagement.Controllers.Payment
         {
             try
             {
+                _logger.LogInformation("[WEBHOOK] PayOS webhook received");
                 using var reader = new StreamReader(Request.Body);
                 var body = await reader.ReadToEndAsync();
-                Console.WriteLine($"PayOS Webhook received: {body}");
+                _logger.LogInformation($"[WEBHOOK] Raw body: {body}");
 
                 // Log all headers
                 foreach (var h in Request.Headers)
