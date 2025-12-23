@@ -1,74 +1,65 @@
 ﻿using CondotelManagement.Services.Interfaces.Shared;
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
-using System.Net.Mail;
-using System.Net;
-using SmtpClient = MailKit.Net.Smtp.SmtpClient;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace CondotelManagement.Services.Implementations.Shared
 {
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _config;
+        private readonly SendGridClient _sendGridClient;
 
         public EmailService(IConfiguration config)
         {
             _config = config;
+            var apiKey = _config["EmailSettings:SendGridApiKey"];
+            _sendGridClient = new SendGridClient(apiKey);
         }
+        private async Task SendEmailViaSendGridAsync(string toEmail, string subject, string htmlBody, string? plainTextBody = null)
+        {
+            var fromEmail = _config["EmailSettings:SenderEmail"];
+            var fromName = _config["EmailSettings:SenderName"];
+            
+            var msg = new SendGridMessage
+            {
+                From = new EmailAddress(fromEmail, fromName),
+                Subject = subject
+            };
+            
+            msg.AddTo(new EmailAddress(toEmail));
+            
+            if (!string.IsNullOrEmpty(htmlBody))
+            {
+                msg.HtmlContent = htmlBody;
+            }
+            
+            if (!string.IsNullOrEmpty(plainTextBody))
+            {
+                msg.PlainTextContent = plainTextBody;
+            }
+            else if (string.IsNullOrEmpty(htmlBody))
+            {
+                msg.PlainTextContent = htmlBody;
+            }
+
+            var response = await _sendGridClient.SendEmailAsync(msg);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Body.ReadAsStringAsync();
+                throw new Exception($"SendGrid API error: {response.StatusCode} - {errorBody}");
+            }
+        }
+
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            var smtpClient = new System.Net.Mail.SmtpClient
-            {
-                Host = _config["Email:SmtpHost"],
-                Port = int.Parse(_config["Email:SmtpPort"]),
-                EnableSsl = true,
-                Credentials = new NetworkCredential(
-                    _config["Email:Username"],
-                    _config["Email:Password"]
-                )
-            };
-
-            var mailMessage = new MailMessage
-            {
-                From = new MailAddress(_config["Email:From"]),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = false
-            };
-
-            mailMessage.To.Add(toEmail);
-
-            await smtpClient.SendMailAsync(mailMessage);
+            await SendEmailViaSendGridAsync(toEmail, subject, body, body);
         }
 
         public async Task SendPasswordResetEmailAsync(string toEmail, string resetLink)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = "Reset Your Password - Condotel Management";
-
-            var body = new BodyBuilder
-            {
-                HtmlBody = $"Please reset your password by <a href='{resetLink}'>clicking here</a>."
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            var htmlBody = $"Please reset your password by <a href='{resetLink}'>clicking here</a>.";
+            await SendEmailViaSendGridAsync(toEmail, "Reset Your Password - Condotel Management", htmlBody);
         }
         public class BookingEmailInfo
         {
@@ -98,12 +89,6 @@ namespace CondotelManagement.Services.Implementations.Shared
           BookingEmailInfo info
       )
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"Xác nhận đặt phòng – {info.CondotelName} ({info.RoomNumber})";
 
             var guestSection = string.IsNullOrWhiteSpace(info.GuestName)
                 ? ""
@@ -217,99 +202,29 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"Xác nhận đặt phòng – {info.CondotelName} ({info.RoomNumber})", htmlBody);
         }
 
 
         public async Task SendPasswordResetOtpAsync(string toEmail, string otp)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = "Your Password Reset OTP - Condotel Management";
-
-            // Sửa lại nội dung email để hiển thị OTP
-            var body = new BodyBuilder
-            {
-                HtmlBody = $"<p>Your password reset OTP code is:</p>" +
+            var htmlBody = $"<p>Your password reset OTP code is:</p>" +
                            $"<h1 style='font-size: 24px; font-weight: bold; color: #333;'>{otp}</h1>" +
                            $"<p>This code will expire in 10 minutes.</p>" +
-                           $"<p>If you did not request this, please ignore this email.</p>"
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+                           $"<p>If you did not request this, please ignore this email.</p>";
+            await SendEmailViaSendGridAsync(toEmail, "Your Password Reset OTP - Condotel Management", htmlBody);
         }
 
         public async Task SendVerificationOtpAsync(string toEmail, string otp)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = "Verify Your Email - Condotel Management";
-
-            var body = new BodyBuilder
-            {
-                HtmlBody = $"<p>Thank you for registering. Your email verification OTP code is:</p>" +
+            var htmlBody = $"<p>Thank you for registering. Your email verification OTP code is:</p>" +
                            $"<h1 style='font-size: 24px; font-weight: bold; color: #333;'>{otp}</h1>" +
-                           $"<p>This code will expire in 10 minutes.</p>"
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+                           $"<p>This code will expire in 10 minutes.</p>";
+            await SendEmailViaSendGridAsync(toEmail, "Verify Your Email - Condotel Management", htmlBody);
         }
 
         public async Task SendRefundConfirmationEmailAsync(string toEmail, string customerName, int bookingId, decimal refundAmount, string? bankCode = null, string? accountNumber = null)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"Xác nhận hoàn tiền thành công - Booking #{bookingId}";
 
             // Format số tiền
             var formattedAmount = refundAmount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -391,34 +306,11 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"Xác nhận hoàn tiền thành công - Booking #{bookingId}", htmlBody);
         }
 
         public async Task SendRefundRejectionEmailAsync(string toEmail, string customerName, int bookingId, decimal refundAmount, string reason)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"Thông báo từ chối yêu cầu hoàn tiền - Booking #{bookingId}";
 
             // Format số tiền
             var formattedAmount = refundAmount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -488,34 +380,11 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"Thông báo từ chối yêu cầu hoàn tiền - Booking #{bookingId}", htmlBody);
         }
 
         public async Task SendPayoutConfirmationEmailAsync(string toEmail, string hostName, int bookingId, string condotelName, decimal amount, DateTime paidAt, string? bankName = null, string? accountNumber = null, string? accountHolderName = null)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"Xác nhận thanh toán thành công - Booking #{bookingId}";
 
             // Format số tiền
             var formattedAmount = amount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -614,34 +483,11 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"Xác nhận thanh toán thành công - Booking #{bookingId}", htmlBody);
         }
 
         public async Task SendPayoutAccountErrorEmailAsync(string toEmail, string hostName, int bookingId, string condotelName, decimal amount, string? currentBankName = null, string? currentAccountNumber = null, string? currentAccountHolderName = null, string? errorMessage = null)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"⚠️ Thông báo lỗi thông tin tài khoản - Booking #{bookingId}";
 
             // Format số tiền
             var formattedAmount = amount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -759,34 +605,11 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"⚠️ Thông báo lỗi thông tin tài khoản - Booking #{bookingId}", htmlBody);
         }
 
         public async Task SendPayoutRejectionEmailAsync(string toEmail, string hostName, int bookingId, string condotelName, decimal amount, string reason)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"❌ Từ chối thanh toán - Booking #{bookingId}";
 
             // Format số tiền
             var formattedAmount = amount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -858,34 +681,11 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"❌ Từ chối thanh toán - Booking #{bookingId}", htmlBody);
         }
 
         public async Task SendVoucherNotificationEmailAsync(string toEmail, string customerName, int bookingId, List<CondotelManagement.Services.Interfaces.Shared.VoucherInfo> vouchers)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"🎁 Bạn đã nhận được {vouchers.Count} voucher từ booking #{bookingId} - Condotel Management";
 
             // Tạo danh sách voucher HTML
             var vouchersHtml = "";
@@ -976,24 +776,7 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"🎁 Bạn đã nhận được {vouchers.Count} voucher từ booking #{bookingId} - Condotel Management", htmlBody);
         }
 
         public async Task SendBookingConfirmationEmailAsync(string toEmail, string customerName, int bookingId, string condotelName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt, string? checkInToken = null, string? guestFullName = null, string? guestPhone = null, string? guestIdNumber = null)
@@ -1001,12 +784,6 @@ namespace CondotelManagement.Services.Implementations.Shared
             try
             {
                 Console.WriteLine($"[EMAIL] Bắt đầu gửi xác nhận booking #{bookingId} tới {toEmail}");
-                var email = new MimeMessage();
-                email.From.Add(new MailboxAddress(
-                    _config["EmailSettings:SenderName"],
-                    _config["EmailSettings:SenderEmail"]));
-                email.To.Add(MailboxAddress.Parse(toEmail));
-                email.Subject = $"✅ Xác nhận đặt phòng thành công - Booking #{bookingId}";
 
                 // Format dữ liệu
                 var formattedAmount = totalAmount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -1147,18 +924,7 @@ namespace CondotelManagement.Services.Implementations.Shared
     </div>
 </body>
 </html>";
-                var body = new BodyBuilder { HtmlBody = htmlBody };
-                email.Body = body.ToMessageBody();
-                using var smtp = new SmtpClient();
-                await smtp.ConnectAsync(
-                    _config["EmailSettings:SmtpServer"],
-                    int.Parse(_config["EmailSettings:Port"]),
-                    SecureSocketOptions.StartTls);
-                await smtp.AuthenticateAsync(
-                    _config["EmailSettings:SenderEmail"],
-                    _config["EmailSettings:Password"]);
-                await smtp.SendAsync(email);
-                await smtp.DisconnectAsync(true);
+                await SendEmailViaSendGridAsync(toEmail, $"✅ Xác nhận đặt phòng thành công - Booking #{bookingId}", htmlBody);
                 Console.WriteLine($"[EMAIL] Đã gửi xác nhận booking #{bookingId} tới {toEmail} thành công");
             }
             catch (Exception ex)
@@ -1170,12 +936,6 @@ namespace CondotelManagement.Services.Implementations.Shared
 
         public async Task SendNewBookingNotificationToHostAsync(string toEmail, string hostName, int bookingId, string condotelName, string customerName, DateOnly checkInDate, DateOnly checkOutDate, decimal totalAmount, DateTime confirmedAt)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress(
-                _config["EmailSettings:SenderName"],
-                _config["EmailSettings:SenderEmail"]));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = $"🏠 Bạn có booking mới #{bookingId} - {condotelName}";
 
             // Format dữ liệu
             var formattedAmount = totalAmount.ToString("N0").Replace(",", ".") + " VNĐ";
@@ -1279,24 +1039,7 @@ namespace CondotelManagement.Services.Implementations.Shared
 </body>
 </html>";
 
-            var body = new BodyBuilder
-            {
-                HtmlBody = htmlBody
-            };
-            email.Body = body.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(
-                _config["EmailSettings:SmtpServer"],
-                int.Parse(_config["EmailSettings:Port"]),
-                SecureSocketOptions.StartTls);
-
-            await smtp.AuthenticateAsync(
-                _config["EmailSettings:SenderEmail"],
-                _config["EmailSettings:Password"]);
-
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await SendEmailViaSendGridAsync(toEmail, $"🏠 Bạn có booking mới #{bookingId} - {condotelName}", htmlBody);
         }
     }
 }
